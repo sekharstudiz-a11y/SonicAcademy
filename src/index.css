@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400..700;1,400..700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Arimo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-hardware-bg: #000000;
+  --color-hardware-card: #111214;
+  --color-hardware-text: #FFFFFF;
+  --color-hardware-muted: #d1d1d6;
+  --color-hardware-accent: var(--accent-color, #ef4444);
+}
+
+@layer base {
+  * {
+    @apply border-white/20 outline-white/30;
+  }
+  body {
+    @apply bg-hardware-bg text-hardware-text font-sans antialiased;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(var(--accent-color-rgb, 239, 68, 68), 0.07) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(var(--accent-color-rgb, 239, 68, 68), 0.04) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer components {
+  .hardware-widget {
+    @apply bg-hardware-card text-hardware-text rounded-xl shadow-2xl border border-white/20;
+  }
+
+  .mono-label {
+    @apply font-mono text-xs tracking-widest uppercase text-hardware-muted;
+  }
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    height: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--accent-color, #ef4444);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    filter: brightness(1.2);
+  }
+}
+
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
