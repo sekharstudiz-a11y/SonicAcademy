@@ -192,6 +192,7 @@ export default function App() {
       }
       
       const synth = new Tone.PolySynth(Tone.Synth, options).connect(filterRef.current!);
+      synth.maxPolyphony = 64;
       synth.set({ detune: pitchShift * 100 });
       synthRef.current = synth;
       
@@ -217,6 +218,7 @@ export default function App() {
 
   const playNote = useCallback((note: string, time?: number) => {
     if (!isAudioStarted || !synthRef.current) return;
+    console.log(`[SonicAcademy] playNote: ${note} at ${time ?? 'now'}`);
     
     try {
       (synthRef.current as Tone.PolySynth).triggerAttack(note, time);
@@ -237,6 +239,7 @@ export default function App() {
 
   const releaseNote = useCallback((note: string, time?: number) => {
     if (!synthRef.current) return;
+    console.log(`[SonicAcademy] releaseNote: ${note} at ${time ?? 'now'}`);
     
     try {
       (synthRef.current as Tone.PolySynth).triggerRelease(note, time);
@@ -266,6 +269,7 @@ export default function App() {
     if (!currentSong || !isAudioStarted || !synthRef.current) return;
 
     if (isPlayingSong) {
+      console.log('[SonicAcademy] Stopping song manually');
       Tone.getTransport().stop();
       Tone.getTransport().cancel();
       partRef.current?.stop();
@@ -277,14 +281,17 @@ export default function App() {
       setActiveNotes(new Set());
       setActiveSongNoteIndex(-1);
     } else {
-      if (partRef.current) partRef.current.dispose();
-      Tone.getTransport().cancel();
-
       setActiveSongNoteIndex(0);
       
-      // Calculate end time to schedule a stop
-      const lastNote = currentSong.notes[currentSong.notes.length - 1];
-      const endTime = lastNote.time + Tone.Time(lastNote.duration).toSeconds();
+      // Calculate the true end time by finding the latest note finish
+      const endTime = Math.max(...currentSong.notes.map(n => 
+        n.time + Tone.Time(n.duration).toSeconds()
+      ));
+
+      console.log(`[SonicAcademy] Starting song: ${currentSong.name}. Expected duration: ${endTime.toFixed(3)}s`);
+      
+      if (partRef.current) partRef.current.dispose();
+      Tone.getTransport().cancel();
 
       partRef.current = new Tone.Part((time, value) => {
         const index = currentSong.notes.indexOf(value);
@@ -292,30 +299,49 @@ export default function App() {
         // Trigger audio precisely at 'time'
         playNote(value.note, time);
         
-        // Schedule release
+        // Schedule release with a tiny buffer to avoid hanging notes
         const durationSeconds = Tone.Time(value.duration).toSeconds();
-        releaseNote(value.note, time + durationSeconds);
+        releaseNote(value.note, time + durationSeconds - 0.01);
 
         // Update current note index visually
         Tone.getDraw().schedule(() => {
           setActiveSongNoteIndex(index);
         }, time);
 
-      }, currentSong.notes).start(0);
+      }, currentSong.notes);
+      
+      partRef.current.loop = false;
+      partRef.current.start(0);
 
-      // Schedule the end of the song
-      Tone.getTransport().schedule((time) => {
-        Tone.getTransport().stop(time);
+      // Ensure transport doesn't loop
+      Tone.getTransport().loop = false;
+
+      // Schedule the end of the song with a slightly larger buffer for safety
+      Tone.getTransport().scheduleOnce((time) => {
+        console.log(`[SonicAcademy] Song end sequence starting at scheduled time: ${time}`);
+        
+        // 1. First release ALL notes immediately
         if (synthRef.current && 'releaseAll' in synthRef.current) {
-          (synthRef.current as any).releaseAll(time);
+          console.log('[SonicAcademy] Releasing all notes at song end');
+          (synthRef.current as any).releaseAll();
         }
+
+        // 2. Stop the transport and Part slightly AFTER the release for a clean break
+        Tone.getTransport().stop(time + 0.05);
+        if (partRef.current) {
+          partRef.current.stop(time + 0.05);
+        }
+
+        // 3. Clear all visual states
         Tone.getDraw().schedule(() => {
+          console.log('[SonicAcademy] UI Resetting at song end');
           setIsPlayingSong(false);
           setIsSongFinished(true);
           setActiveSongNoteIndex(-1);
           setActiveNotes(new Set());
-        }, time);
-      }, endTime + 0.1);
+          setLastNote(null);
+        }, time + 0.05);
+      }, endTime + 0.15);
 
       Tone.getTransport().start();
       setIsPlayingSong(true);
